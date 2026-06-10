@@ -1,0 +1,446 @@
+﻿<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>نظام محاسبي متكامل - AL-MOHANDES HONEY</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+</head>
+<body>
+  <!-- مودال الترخيص -->
+  <div id="licenseModal" class="modal" style="display: none; z-index: 2000;">
+    <div class="modal-content" style="max-width: 350px; text-align: center;">
+      <h3>🔒 ترخيص التطبيق</h3>
+      <div id="licenseMessage" style="margin-bottom: 15px; color: #856404;"></div>
+      <div style="margin-bottom: 15px;">
+        <label for="licensePasswordInput">كلمة المرور الرئيسية:</label>
+        <input type="password" id="licensePasswordInput" style="width: 100%;">
+      </div>
+      <div id="licenseError" style="color: red; margin-bottom: 10px;"></div>
+      <button id="licenseActivateBtn">تفعيل / تجديد</button>
+      <div style="margin-top: 15px; font-size: 13px; color: #666;">
+        للدعم الفني: <strong dir="ltr">01221490962</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- مودال تسجيل الدخول للمستخدمين -->
+  <div id="loginModal" class="modal" style="display: none; z-index: 2000;">
+    <div class="modal-content" style="max-width: 350px; text-align: center;">
+      <h3>🔐 تسجيل الدخول</h3>
+      <div style="margin-bottom: 15px;">
+        <label for="loginEmail">البريد الإلكتروني:</label>
+        <input type="email" id="loginEmail" autocomplete="off" style="width: 100%;" dir="ltr">
+      </div>
+      <div style="margin-bottom: 15px;">
+        <label for="loginPassword">كلمة المرور:</label>
+        <input type="password" id="loginPassword" style="width: 100%;">
+      </div>
+      <div id="loginError" style="color: red; margin-bottom: 10px;"></div>
+      <button id="loginBtn">دخول</button>
+      <div style="margin-top: 10px; font-size: 13px; color: #666;">
+        للدعم الفني: <strong dir="ltr">01221490962</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- محتوى التطبيق الرئيسي -->
+  <div id="appContainer" class="container" style="display: none;">
+    <!-- شريط التنبيه بالترخيص -->
+    <div id="licenseRemaining" style="text-align: center; background: #d4edda; color: #155724; padding: 10px; border-radius: 8px; margin-bottom: 15px; display: none;"></div>
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+      <h2 style="margin:0;">🍯 AL-MOHANDES APP</h2>
+      <div>
+        <span id="currentUserDisplay" style="margin-left: 15px; font-weight: bold;"></span>
+        <button id="logoutBtn" class="danger-btn">🚪 تسجيل الخروج</button>
+      </div>
+    </div>
+
+    <!-- أقسام الأدمن -->
+    <div id="adminSections">
+      <!-- إدارة الأقسام -->
+      <section class="categories-section">
+        <div class="section-header">
+          <h2>إدارة الأقسام</h2>
+          <button class="toggle-section-btn" data-section="categories">🔽 إخفاء</button>
+        </div>
+        <div id="categories-content" class="section-content">
+          <div class="category-form">
+            <input type="text" id="categoryName" placeholder="اسم القسم الجديد">
+            <button id="addCategoryBtn">➕ إضافة قسم</button>
+          </div>
+          <div id="categoriesList"></div>
+        </div>
+      </section>
+
+      <!-- إدارة المنتجات -->
+      <section class="products-section">
+        <div class="section-header">
+          <h2>إدارة المنتجات</h2>
+          <button class="toggle-section-btn" data-section="products-management">🔽 إخفاء</button>
+        </div>
+        <div id="products-management-content" class="section-content">
+          <form id="productForm">
+            <label for="productName">اسم المنتج:</label>
+            <input type="text" id="productName" required>
+            <label for="productCategory">القسم:</label>
+            <select id="productCategory" required></select>
+            <label for="productSupplier">المورد:</label>
+            <div class="flex-row">
+              <select id="productSupplier" required></select>
+              <button type="button" id="openSupplierModalBtn" class="small-btn">➕ جديد</button>
+            </div>
+            <label for="productCost">سعر الشراء:</label>
+            <input type="number" id="productCost" step="0.01" required>
+            <label for="productPrice">سعر البيع:</label>
+            <input type="number" id="productPrice" step="0.01" required>
+            <label for="productStock">الكمية:</label>
+            <input type="number" id="productStock" required>
+            <label for="productBarcode">الباركود (اختياري):</label>
+            <input type="text" id="productBarcode" placeholder="أدخل باركود المنتج">
+            <button type="button" id="addProductBtn">➕ إضافة المنتج</button>
+          </form>
+          <div class="products-header">
+            <div class="search-box">
+              <input type="text" id="searchProduct" placeholder="🔍 ابحث عن منتج...">
+              <span id="lowStockSummary"></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- العملاء والموردين -->
+      <section class="parties-section">
+        <div class="section-header">
+          <h2>👥 العملاء والموردين</h2>
+          <button class="toggle-section-btn" data-section="parties">🔽 إخفاء</button>
+        </div>
+        <div id="parties-content" class="section-content">
+          <div class="party-tabs">
+            <button class="tab-btn active" data-tab="customers">العملاء</button>
+            <button class="tab-btn" data-tab="suppliers">الموردين</button>
+          </div>
+          <div id="customersTab" class="party-tab active">
+            <div class="party-form">
+              <input type="text" id="customerName" placeholder="اسم العميل">
+              <input type="text" id="customerPhone" placeholder="رقم الهاتف">
+              <button id="addCustomerBtn">➕ إضافة عميل</button>
+            </div>
+            <input type="text" id="searchCustomer" placeholder="🔍 بحث عن عميل...">
+            <div id="customersList"></div>
+          </div>
+          <div id="suppliersTab" class="party-tab">
+            <div class="party-form">
+              <input type="text" id="supplierName" placeholder="اسم المورد">
+              <input type="text" id="supplierPhone" placeholder="رقم الهاتف">
+              <button id="addSupplierBtn">➕ إضافة مورد</button>
+            </div>
+            <input type="text" id="searchSupplier" placeholder="🔍 بحث عن مورد...">
+            <div id="suppliersList"></div>
+          </div>
+        </div>
+      </section>
+      
+      <!-- سداد مستحقات الموردين -->
+      <section class="supplier-payment-section">
+        <div class="section-header">
+          <h2>💰 سداد مستحقات الموردين</h2>
+          <button class="toggle-section-btn" data-section="supplier-payment">🔽 إخفاء</button>
+        </div>
+        <div id="supplier-payment-content" class="section-content">
+          <div class="payment-form">
+            <label for="paymentSupplier">اختر المورد:</label>
+            <select id="paymentSupplier"></select>
+            <label for="paymentAmount">المبلغ المسدد:</label>
+            <input type="number" id="paymentAmount" step="0.01" min="0">
+            <label for="paymentNote">البيان (اختياري):</label>
+            <input type="text" id="paymentNote">
+            <button id="processPaymentBtn" class="success-btn">تسجيل السداد</button>
+          </div>
+          <div id="paymentResult"></div>
+        </div>
+      </section>
+
+      <!-- استلام بضاعة -->
+      <section class="receiving-section">
+        <div class="section-header">
+          <h2>📥 استلام بضاعة</h2>
+          <button class="toggle-section-btn" data-section="receiving">🔽 إخفاء</button>
+        </div>
+        <div id="receiving-content" class="section-content">
+          <div class="receiving-controls">
+            <label for="receivingSupplier">اختر المورد:</label>
+            <select id="receivingSupplier"></select>
+            <div class="barcode-receive-area">
+              <label>📷 مسح باركود المنتج:</label>
+              <div class="flex-row">
+                <input type="text" id="receivingBarcodeInput" placeholder="باركود المنتج">
+                <button id="startReceiveScannerBtn" class="small-btn">📷 مسح</button>
+                <button id="stopReceiveScannerBtn" class="small-btn cancel-btn" style="display:none;">⏹️ إيقاف</button>
+              </div>
+              <div id="receiveScannerContainer" style="display:none; margin-top:10px;">
+                <div id="qr-reader-receive" style="width:100%; max-width:400px; margin:0 auto;"></div>
+              </div>
+            </div>
+            <div id="receivePreview" class="receive-preview" style="display:none;">
+              <h4>المنتج الممسوح</h4>
+              <p><strong>الاسم:</strong> <span id="receiveProductName"></span></p>
+              <p><strong>الباركود:</strong> <span id="receiveProductBarcode"></span></p>
+              <div class="flex-row">
+                <label>الكمية المستلمة:</label>
+                <input type="number" id="receiveQuantity" value="1" min="1">
+              </div>
+              <div class="flex-row">
+                <label>سعر الشراء (اختياري):</label>
+                <input type="number" id="receiveCost" step="0.01" placeholder="السعر الحالي أو الجديد">
+              </div>
+              <button id="confirmReceiveBtn" class="success-btn">✔ تأكيد الاستلام</button>
+              <button id="cancelReceiveBtn" class="cancel-btn">إلغاء</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- القيود اليومية -->
+      <section class="journal-section">
+        <div class="section-header">
+          <h2>📒 القيود اليومية</h2>
+          <button class="toggle-section-btn" data-section="journal-entries">🔽 إخفاء</button>
+        </div>
+        <div id="journal-entries-content" class="section-content">
+          <button id="showJournalEntriesBtn">عرض القيود</button>
+          <div id="journalEntriesList"></div>
+        </div>
+      </section>
+
+      <!-- التقارير المالية -->
+      <section class="financial-reports">
+        <h2>📊 التقارير المالية</h2>
+        <div class="report-buttons">
+          <button id="incomeStatementBtn">قائمة الدخل</button>
+          <button id="balanceSheetBtn">الميزانية العمومية</button>
+          <button id="profitMarginBtn">تقرير هامش الربح</button>
+          <button id="productSalesReportBtn">📊 تقرير المبيعات حسب المنتج</button>
+        </div>
+        <div id="financialReport"></div>
+        <div class="export-buttons">
+          <button id="exportToExcelBtn" class="success-btn">📊 تصدير إلى Excel</button>
+          <button id="exportToPDFBtn" class="success-btn">📄 تصدير إلى PDF</button>
+        </div>
+      </section>
+
+      <!-- الرسوم البيانية -->
+      <section class="charts-section">
+        <h2>📈 الرسوم البيانية للمبيعات</h2>
+        <div class="chart-controls">
+          <div class="control-group">
+            <label for="chartType">نوع الرسم:</label>
+            <select id="chartType">
+              <option value="line">خطي</option>
+              <option value="bar">أعمدة</option>
+              <option value="stacked">أعمدة مكدسة</option>
+              <option value="pie">دائري</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label for="periodType">الفترة:</label>
+            <select id="periodType">
+              <option value="daily">يومية</option>
+              <option value="weekly">أسبوعية</option>
+              <option value="monthly">شهرية</option>
+              <option value="yearly">سنوية</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label for="productSelect">المنتج:</label>
+            <select id="productSelect"><option value="all">كل المنتجات</option></select>
+          </div>
+          <div class="control-group">
+            <label for="comparisonMode">وضع المقارنة:</label>
+            <select id="comparisonMode">
+              <option value="single">منتج واحد</option>
+              <option value="compare">مقارنة منتجات</option>
+              <option value="yearCompare">مقارنة سنوية</option>
+            </select>
+          </div>
+          <div class="control-group" id="compareProductsGroup" style="display:none;">
+            <label>اختر منتجات:</label>
+            <select id="compareProductsList" multiple size="3"></select>
+          </div>
+          <div class="control-group" id="yearCompareGroup" style="display:none;">
+            <label for="compareYearMonth">الشهر:</label>
+            <select id="compareYearMonth">
+              <option value="all">كل السنة</option>
+              <option value="1">يناير</option><option value="2">فبراير</option><option value="3">مارس</option>
+              <option value="4">أبريل</option><option value="5">مايو</option><option value="6">يونيو</option>
+              <option value="7">يوليو</option><option value="8">أغسطس</option><option value="9">سبتمبر</option>
+              <option value="10">أكتوبر</option><option value="11">نوفمبر</option><option value="12">ديسمبر</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label for="dateFrom">من تاريخ:</label><input type="date" id="dateFrom">
+          </div>
+          <div class="control-group">
+            <label for="dateTo">إلى تاريخ:</label><input type="date" id="dateTo">
+          </div>
+          <div class="control-group">
+            <button id="resetDateRangeBtn" class="small-btn">إعادة تعيين</button>
+          </div>
+          <div class="control-group">
+            <label for="trendLineToggle">خط الاتجاه:</label>
+            <input type="checkbox" id="trendLineToggle">
+          </div>
+          <div class="control-group" id="trendWindowGroup" style="display:none;">
+            <label for="trendWindow">نافذة المتوسط:</label>
+            <input type="number" id="trendWindow" value="3" min="2" max="10" style="width:60px;">
+          </div>
+          <button id="generateChartBtn" class="success-btn">عرض الرسم</button>
+          <button id="downloadChartBtn" class="success-btn" style="background:#17a2b8;">💾 حفظ كصورة</button>
+          <button id="refreshChartBtn" class="small-btn">🔄 تحديث</button>
+        </div>
+        <div class="chart-container"><canvas id="salesChart" width="800" height="400"></canvas></div>
+        <div class="chart-extra">
+          <div id="chartStatsContainer" class="chart-stats"></div>
+          <div class="top-bottom">
+            <div class="top-products"><h4>🏅 الأكثر مبيعاً</h4><ul></ul></div>
+            <div class="bottom-products"><h4>⚠️ الأقل مبيعاً</h4><ul></ul></div>
+          </div>
+          <div class="chart-data-table">
+            <h4>📋 البيانات التفصيلية</h4>
+            <table id="chartDataTable"><thead></thead><tbody></tbody></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- إدارة المستخدمين -->
+      <section class="users-management-section">
+        <div class="section-header">
+          <h2>👤 إدارة المستخدمين</h2>
+          <button class="toggle-section-btn" data-section="users-management">🔽 إخفاء</button>
+        </div>
+        <div id="users-management-content" class="section-content">
+          <div class="user-form">
+            <input type="email" id="newUserEmail" placeholder="البريد الإلكتروني" dir="ltr">
+            <input type="password" id="newUserPassword" placeholder="كلمة المرور">
+            <button id="addUserBtn">➕ إضافة مستخدم</button>
+          </div>
+          <div id="usersList"></div>
+        </div>
+      </section>
+
+      <!-- إدارة البيانات -->
+      <section class="data-management">
+        <h2>💾 إدارة البيانات</h2>
+        <button id="exportJSONBtn">حفظ JSON</button>
+        <input type="file" id="importJSONFile" accept=".json" style="display:none;">
+        <label for="importJSONFile" class="button">استيراد JSON</label>
+        <button id="resetDataBtn" class="danger-btn">إعادة ضبط</button>
+        <button id="fullLogoutBtn" class="danger-btn" style="background-color:#6c757d;">🚪 تسجيل خروج كامل</button>
+      </section>
+    </div>
+
+    <!-- ===== إعدادات الحساب (للجميع) ===== -->
+    <section id="accountSettingsSection" class="account-settings-section">
+      <div class="section-header">
+        <h2>⚙️ إعدادات الحساب</h2>
+        <button class="toggle-section-btn" data-section="account-settings">🔽 إخفاء</button>
+      </div>
+      <div id="account-settings-content" class="section-content">
+        <div class="settings-form">
+          <h3>تغيير البريد الإلكتروني</h3>
+          <div class="flex-row">
+            <input type="email" id="newEmailInput" placeholder="البريد الإلكتروني الجديد" dir="ltr">
+            <button id="changeEmailBtn" class="success-btn">💾 تغيير البريد</button>
+          </div>
+          <div id="emailChangeMsg" style="margin-top: 5px;"></div>
+        </div>
+        <hr>
+        <div class="settings-form">
+          <h3>تغيير كلمة المرور</h3>
+          <div>
+            <label for="oldPasswordInput">كلمة المرور الحالية:</label>
+            <input type="password" id="oldPasswordInput">
+          </div>
+          <div>
+            <label for="newPasswordInput">كلمة المرور الجديدة:</label>
+            <input type="password" id="newPasswordInput">
+          </div>
+          <button id="changePasswordBtn" class="success-btn" style="margin-top:10px;">🔐 تغيير كلمة المرور</button>
+          <div id="passwordChangeMsg" style="margin-top: 5px;"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- الأقسام المشتركة (للجميع) -->
+    <section class="products-list-section">
+      <div class="section-header">
+        <h3>قائمة المنتجات حسب الأقسام</h3>
+        <button class="toggle-section-btn" data-section="products-list">🔽 إخفاء</button>
+      </div>
+      <div id="products-list-content" class="section-content">
+        <div id="productsByCategory"></div>
+      </div>
+    </section>
+
+    <section class="invoices-section">
+      <h2>🧾 إنشاء فاتورة بيع</h2>
+      <div class="invoice-controls">
+        <label for="buyerSelect">اختر عميل:</label>
+        <select id="buyerSelect"></select>
+        <label for="buyerName">أو اسم جديد:</label>
+        <input type="text" id="buyerName" placeholder="اسم المشتري">
+        <button id="createInvoiceBtn">➕ إنشاء فاتورة</button>
+        <button id="finalizeInvoiceBtn" class="success-btn">✔ تحرير الفاتورة</button>
+        <button id="cancelInvoiceBtn" class="cancel-btn">✖ إلغاء الفاتورة</button>
+        <div class="barcode-reader" style="margin-top:10px;">
+          <label>📷 باركود البيع:</label>
+          <div class="flex-row">
+            <input type="text" id="barcodeInput" placeholder="امسح الباركود">
+            <button id="addByBarcodeBtn" class="small-btn">➕ إضافة</button>
+          </div>
+          <div class="flex-row" style="margin-top:5px;">
+            <button id="startScannerBtn" class="small-btn">📷 فتح الماسح</button>
+            <button id="stopScannerBtn" class="small-btn cancel-btn" style="display:none;">⏹️ إيقاف</button>
+            <label style="margin-right:10px;"><input type="checkbox" id="quickSaleMode"> بيع سريع (1)</label>
+            <label style="margin-right:10px;"><input type="checkbox" id="continuousScanMode"> متواصل</label>
+          </div>
+          <div id="scannerContainer" style="display:none;margin-top:10px;">
+            <div id="qr-reader" style="width:100%;max-width:400px;"></div>
+          </div>
+        </div>
+      </div>
+      <div id="currentInvoiceDisplay" class="current-invoice">
+        <h3>الفاتورة الحالية</h3>
+        <div id="currentInvoiceDetails"></div>
+      </div>
+      <h3>📂 الفواتير السابقة</h3>
+      <div class="invoice-selector">
+        <select id="invoiceSelector"></select>
+        <button id="deleteInvoiceBtn" class="delete-btn">🗑 حذف</button>
+        <button id="printInvoiceBtn">🖨 طباعة</button>
+      </div>
+      <div id="invoiceDetails"></div>
+    </section>
+  </div>
+
+  <!-- نافذة إضافة مورد سريع -->
+  <div id="supplierModal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h3>إضافة مورد جديد</h3>
+      <input type="text" id="modalSupplierName" placeholder="اسم المورد">
+      <input type="text" id="modalSupplierPhone" placeholder="رقم الهاتف">
+      <button id="modalAddSupplierBtn">إضافة</button>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
