@@ -228,6 +228,7 @@
           <button id="balanceSheetBtn">الميزانية العمومية</button>
           <button id="profitMarginBtn">تقرير هامش الربح</button>
           <button id="productSalesReportBtn">📊 تقرير المبيعات حسب المنتج</button>
+          <button id="employeeSalesReportBtn">👥 تقرير مبيعات الموظفين</button>
         </div>
         <div id="financialReport"></div>
         <div class="export-buttons">
@@ -268,6 +269,7 @@
               <option value="single">منتج واحد</option>
               <option value="compare">مقارنة منتجات</option>
               <option value="yearCompare">مقارنة سنوية</option>
+              <option value="employee">حسب الموظف</option>
             </select>
           </div>
           <div class="control-group" id="compareProductsGroup" style="display:none;">
@@ -291,7 +293,8 @@
             <label for="dateTo">إلى تاريخ:</label><input type="date" id="dateTo">
           </div>
           <div class="control-group">
-            <button id="resetDateRangeBtn" class="small-btn">إعادة تعيين</button>
+            <button id="resetDateRangeBtn" class="small-btn">إعادة تعيين النطاق</button>
+            <button id="showAllChartBtn" class="small-btn" style="background:#6c757d; margin-right:5px;">عرض الكل</button>
           </div>
           <div class="control-group">
             <label for="trendLineToggle">خط الاتجاه:</label>
@@ -327,6 +330,7 @@
         </div>
         <div id="users-management-content" class="section-content">
           <div class="user-form">
+            <input type="text" id="newUserName" placeholder="اسم الموظف">
             <input type="email" id="newUserEmail" placeholder="البريد الإلكتروني" dir="ltr">
             <input type="password" id="newUserPassword" placeholder="كلمة المرور">
             <button id="addUserBtn">➕ إضافة مستخدم</button>
