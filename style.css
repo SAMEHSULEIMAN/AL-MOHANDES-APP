@@ -1,4 +1,4 @@
-﻿/* ===== إعدادات عامة ===== */
+/* ===== إعدادات عامة ===== */
 * { box-sizing: border-box; }
 body {
   font-family: 'Cairo', Arial, sans-serif;
@@ -58,13 +58,14 @@ label { display: block; margin: 10px 0 5px; font-weight: bold; }
 .supplier-payment-section,.invoices-section,
 .journal-section,.financial-reports,.charts-section,.data-management,
 .receiving-section,.users-management-section,
-.account-settings-section {
+.account-settings-section,.financial-settings-section {
   background: #fff8e7; border-radius: 10px; padding: 15px;
   margin-bottom: 25px; border: 1px solid #ffd966;
 }
 .receiving-section { background: #f4f9e9; border-color: #b5d6a7; }
 .users-management-section { background: #f0f7ff; border-color: #a0c4ff; }
 .account-settings-section { background: #f4f0ff; border-color: #b39ddb; }
+.financial-settings-section { background: #e8f5e9; border-color: #81c784; }
 
 /* الأقسام */
 .category-form { display: flex; gap: 10px; margin-bottom: 15px; }
@@ -233,3 +234,6 @@ label { display: block; margin: 10px 0 5px; font-weight: bold; }
 /* إعدادات الحساب */
 .settings-form { margin-bottom: 15px; }
 .settings-form h3 { margin-top: 0; color: #5e35b1; }
+
+/* الإعدادات المالية */
+.financial-settings-section .settings-form h3 { color: #2e7d32; }
