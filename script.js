@@ -1,5 +1,7 @@
-﻿// ============================================
-// النظام المحاسبي المتكامل - النسخة الكاملة
+// ============================================
+// النظام المحاسبي المتكامل - الإصدار النهائي
+// ترخيص + مستخدمين + شريط تنازلي + رأس مال افتتاحي
+// مع إصلاح تضاعف رأس المال في الميزانية
 // ============================================
 
 // ===== ثوابت الترخيص =====
@@ -135,6 +137,7 @@ const CHART_COLORS = [
   '#1ABC9C', '#E67E22', '#95A5A6', '#D35400', '#27AE60'
 ];
 
+// ===== كلاس التطبيق الرئيسي =====
 class AccountingApp {
   constructor(user) {
     this.currentUser = user;
@@ -161,7 +164,8 @@ class AccountingApp {
       'journal-entries': false,
       receiving: false,
       'users-management': false,
-      'account-settings': false
+      'account-settings': false,
+      'financial-settings': false
     };
 
     this.elements = {};
@@ -1463,6 +1467,38 @@ class AccountingApp {
     this.elements.newPasswordInput.value = '';
   }
 
+  // ========== الإعدادات المالية (رأس المال الافتتاحي) - تم إصلاح التضاعف ==========
+  updateOpeningCapital() {
+    const amount = parseFloat(this.elements.openingCapitalInput.value);
+    if (isNaN(amount) || amount <= 0) {
+      this.elements.capitalMsg.innerHTML = '<span style="color:red;">أدخل مبلغاً صحيحاً أكبر من صفر</span>';
+      return;
+    }
+    // التأكد من عدم وجود معاملات أخرى غير القيد الافتتاحي
+    const otherEntries = this.journalEntries.filter(e => e.description !== 'رأس المال الافتتاحي');
+    if (otherEntries.length > 0) {
+      this.elements.capitalMsg.innerHTML = '<span style="color:red;">لا يمكن تغيير رأس المال بعد إجراء معاملات أخرى</span>';
+      return;
+    }
+    
+    // حذف القيد الافتتاحي القديم إن وجد، مع تصحيح الرصيد
+    const oldEntryIndex = this.journalEntries.findIndex(e => e.description === 'رأس المال الافتتاحي');
+    if (oldEntryIndex !== -1) {
+      const oldEntry = this.journalEntries[oldEntryIndex];
+      // لأن القيد القديم كان مدينًا للنقدية (يزيد النقدية)، عند حذفه نطرح قيمته
+      this.cashBalance -= this.ensureNumber(oldEntry.amount);
+      this.journalEntries.splice(oldEntryIndex, 1);
+    }
+    
+    // الآن cashBalance يجب أن يكون 0 (بعد حذف القديم)، ثم addJournalEntry ستضيف المبلغ الجديد وتضبط الرصيد
+    this.addJournalEntry('رأس المال الافتتاحي', ACCOUNTS.CASH, ACCOUNTS.CAPITAL, amount);
+    
+    this.saveData();
+    this.elements.capitalMsg.innerHTML = '<span style="color:green;">✅ تم تحديث رأس المال الافتتاحي بنجاح</span>';
+    this.elements.openingCapitalInput.value = '';
+    this.showJournalEntries();
+  }
+
   // ========== الطي والتبويب ==========
   toggleSection(sectionId) {
     const content = document.getElementById(`${sectionId}-content`);
@@ -1591,7 +1627,10 @@ class AccountingApp {
       newPasswordInput: document.getElementById('newPasswordInput'),
       changePasswordBtn: document.getElementById('changePasswordBtn'),
       passwordChangeMsg: document.getElementById('passwordChangeMsg'),
-      fullLogoutBtn: document.getElementById('fullLogoutBtn')
+      fullLogoutBtn: document.getElementById('fullLogoutBtn'),
+      openingCapitalInput: document.getElementById('openingCapitalInput'),
+      updateCapitalBtn: document.getElementById('updateCapitalBtn'),
+      capitalMsg: document.getElementById('capitalMsg')
     };
 
     this.elements.addCategoryBtn.addEventListener('click', () => this.addCategory(this.elements.categoryName.value));
@@ -1652,6 +1691,8 @@ class AccountingApp {
 
     this.elements.changeEmailBtn.addEventListener('click', () => this.changeEmail());
     this.elements.changePasswordBtn.addEventListener('click', () => this.changePassword());
+
+    this.elements.updateCapitalBtn.addEventListener('click', () => this.updateOpeningCapital());
 
     this.elements.fullLogoutBtn.addEventListener('click', () => {
       if (confirm('سيؤدي هذا إلى مسح الترخيص بالكامل والخروج من التطبيق. متابعة؟')) {
