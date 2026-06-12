@@ -1,7 +1,6 @@
 // ============================================
-// النظام المحاسبي المتكامل - الإصدار النهائي
-// ترخيص + مستخدمين + شريط تنازلي + رأس مال افتتاحي
-// مع إصلاح تضاعف رأس المال في الميزانية
+// النظام المحاسبي المتكامل - الإصدار النهائي الموسع
+// مع ميزات: اسم الموظف على الفاتورة + تقارير/رسوم بيانية للموظفين
 // ============================================
 
 // ===== ثوابت الترخيص =====
@@ -23,7 +22,7 @@ function getRemainingDays() {
 function isLicenseExpired() { const r = getRemainingDays(); return r !== null && r <= 0; }
 function isLicenseValid() { return !isLicenseExpired() && getLicenseStartDate() !== null; }
 
-// ===== ثوابت المستخدمين =====
+// ===== ثوابت المستخدمين (مُوسَّعة) =====
 const USER_STORAGE_KEY = 'appUsers';
 const SESSION_KEY = 'currentUser';
 
@@ -50,6 +49,7 @@ function initDefaultAdmin() {
       email: 'admin@admin',
       passwordHash: simpleHash('admin'),
       role: 'admin',
+      displayName: 'المدير',
       createdAt: new Date().toISOString()
     });
     saveUsers(users);
@@ -59,7 +59,7 @@ function loginUser(email, password) {
   const users = getUsers();
   const user = users.find(u => u.email === email);
   if (user && user.passwordHash === simpleHash(password)) {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ email: user.email, role: user.role }));
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ email: user.email, role: user.role, displayName: user.displayName || user.email }));
     return user;
   }
   return null;
@@ -72,13 +72,14 @@ function logoutUser() {
   sessionStorage.removeItem(SESSION_KEY);
   location.reload();
 }
-function addUserByAdmin(email, password) {
+function addUserByAdmin(email, password, displayName) {
   const users = getUsers();
   if (users.some(u => u.email === email)) return false;
   users.push({
     email,
     passwordHash: simpleHash(password),
     role: 'user',
+    displayName: displayName || email,
     createdAt: new Date().toISOString()
   });
   saveUsers(users);
@@ -137,7 +138,6 @@ const CHART_COLORS = [
   '#1ABC9C', '#E67E22', '#95A5A6', '#D35400', '#27AE60'
 ];
 
-// ===== كلاس التطبيق الرئيسي =====
 class AccountingApp {
   constructor(user) {
     this.currentUser = user;
@@ -209,6 +209,22 @@ class AccountingApp {
     } catch(e) { return isoString; }
   }
 
+  parseOptionalDate(dateStr) {
+    if (!dateStr || !dateStr.trim()) return null;
+    const d = new Date(dateStr);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  validateDateRange(fromStr, toStr) {
+    const from = this.parseOptionalDate(fromStr);
+    const to = this.parseOptionalDate(toStr);
+    if (from && to && from > to) {
+      alert('تاريخ "من" يجب أن يكون قبل تاريخ "إلى"');
+      return false;
+    }
+    return true;
+  }
+
   normalizeData() {
     this.customers.forEach(c => { c.balance = this.ensureNumber(c.balance); });
     this.suppliers.forEach(s => { s.balance = this.ensureNumber(s.balance); });
@@ -225,6 +241,7 @@ class AccountingApp {
           item.totalCost = this.ensureNumber(item.totalCost);
         });
       }
+      if (!inv.createdBy) inv.createdBy = 'admin@admin'; // توافق مع البيانات القديمة
     });
     this.cashBalance = this.ensureNumber(this.cashBalance);
     this.nextProductId = this.ensureNumber(this.nextProductId, 1);
@@ -355,7 +372,7 @@ class AccountingApp {
     const isAdmin = this.currentUser.role === 'admin';
     document.getElementById('adminSections').style.display = isAdmin ? '' : 'none';
     document.getElementById('currentUserDisplay').textContent =
-      `${this.currentUser.email} (${isAdmin ? 'مدير' : 'موظف'})`;
+      `${this.currentUser.displayName || this.currentUser.email} (${isAdmin ? 'مدير' : 'موظف'})`;
     if (isAdmin) {
       this.renderUsersList();
     }
@@ -858,7 +875,11 @@ class AccountingApp {
     const container = this.elements.currentInvoiceDetails;
     if (!container) return;
     if (!this.currentInvoice) { container.innerHTML = '<p class="empty">لا توجد فاتورة حالية.</p>'; return; }
-    let html = `<p><strong>المشتري:</strong> ${this.escapeHtml(this.currentInvoice.buyerName)}</p><p><strong>التاريخ:</strong> ${this.formatDate(this.currentInvoice.date)}</p><table class="invoice-table"><thead><tr><th>المنتج</th><th>الكمية</th><th>الإجمالي</th><th></th></tr></thead><tbody>`;
+    const employeeName = this.currentUser.displayName || this.currentUser.email;
+    let html = `<p><strong>المشتري:</strong> ${this.escapeHtml(this.currentInvoice.buyerName)}</p>
+      <p><strong>التاريخ:</strong> ${this.formatDate(this.currentInvoice.date)}</p>
+      <p><strong>البائع:</strong> ${this.escapeHtml(employeeName)}</p>
+      <table class="invoice-table"><thead><tr><th>المنتج</th><th>الكمية</th><th>الإجمالي</th><th></th></tr></thead><tbody>`;
     this.currentInvoice.productsSold.forEach((item, idx) => {
       html += `<tr><td>${this.escapeHtml(item.productName)}</td><td>${this.ensureNumber(item.quantity)}</td><td>${this.ensureNumber(item.amount).toFixed(2)}</td><td><button class="remove-invoice-item" data-index="${idx}">إزالة</button></td></tr>`;
     });
@@ -870,7 +891,7 @@ class AccountingApp {
   cancelCurrentInvoice() { if (this.currentInvoice && confirm('إلغاء الفاتورة الحالية؟')) { this.currentInvoice = null; this.displayCurrentInvoice(); this.stopBarcodeScanner(); } }
   finalizeInvoice() {
     if (!this.currentInvoice || this.currentInvoice.productsSold.length === 0) return alert('الفاتورة فارغة');
-    const invCopy = { ...this.currentInvoice, id: this.nextInvoiceId++ };
+    const invCopy = { ...this.currentInvoice, id: this.nextInvoiceId++, createdBy: this.currentUser.email };
     this.invoices.push(invCopy);
     this.addJournalEntry(`فاتورة بيع رقم ${invCopy.id} - ${invCopy.buyerName}`, ACCOUNTS.CUSTOMERS, ACCOUNTS.SALES, invCopy.totalAmount);
     const totalCost = invCopy.productsSold.reduce((sum, item) => sum + this.ensureNumber(item.totalCost), 0);
@@ -893,7 +914,9 @@ class AccountingApp {
     if (isNaN(idx)) { if (this.elements.invoiceDetails) this.elements.invoiceDetails.innerHTML = ''; return; }
     const inv = this.invoices[idx];
     if (!inv) return;
-    let html = `<h3>تفاصيل الفاتورة</h3><p><strong>المشتري:</strong> ${this.escapeHtml(inv.buyerName)}</p><p><strong>التاريخ:</strong> ${this.formatDate(inv.date)}</p><table class="invoice-table"><thead><tr><th>المنتج</th><th>الكمية</th><th>الإجمالي</th></tr></thead><tbody>`;
+    const employee = getUsers().find(u => u.email === inv.createdBy);
+    const employeeName = employee ? (employee.displayName || employee.email) : (inv.createdBy || 'غير معروف');
+    let html = `<h3>تفاصيل الفاتورة</h3><p><strong>المشتري:</strong> ${this.escapeHtml(inv.buyerName)}</p><p><strong>التاريخ:</strong> ${this.formatDate(inv.date)}</p><p><strong>البائع:</strong> ${this.escapeHtml(employeeName)}</p><table class="invoice-table"><thead><tr><th>المنتج</th><th>الكمية</th><th>الإجمالي</th></tr></thead><tbody>`;
     inv.productsSold.forEach(item => { html += `<tr><td>${this.escapeHtml(item.productName)}</td><td>${this.ensureNumber(item.quantity)}</td><td>${this.ensureNumber(item.amount).toFixed(2)}</td></tr>`; });
     html += `</tbody><tfoot><tr><td colspan="2"><strong>الإجمالي الكلي</strong></td><td>${this.ensureNumber(inv.totalAmount).toFixed(2)}</td></tr></tfoot></table>`;
     if (this.elements.invoiceDetails) this.elements.invoiceDetails.innerHTML = html;
@@ -907,8 +930,10 @@ class AccountingApp {
     const idx = parseInt(this.elements.invoiceSelector.value);
     if (isNaN(idx)) return alert('اختر فاتورة');
     const inv = this.invoices[idx];
+    const employee = getUsers().find(u => u.email === inv.createdBy);
+    const employeeName = employee ? (employee.displayName || employee.email) : (inv.createdBy || 'غير معروف');
     const win = window.open('', '_blank');
-    win.document.write(`<html dir="rtl"><head><title>فاتورة #${inv.id}</title><style>body{font-family:'Cairo',sans-serif;padding:20px;}table{width:100%;border-collapse:collapse;margin:20px 0;}th,td{border:1px solid #333;padding:8px;text-align:center;}th{background:#f2f2f2;}</style></head><body><h2 style="text-align:center;">فاتورة بيع</h2><p><strong>اسم المشتري:</strong> ${this.escapeHtml(inv.buyerName)}</p><p><strong>التاريخ:</strong> ${this.formatDate(inv.date)}</p><table><thead><tr><th>المنتج</th><th>الكمية</th><th>الإجمالي</th></tr></thead><tbody>`);
+    win.document.write(`<html dir="rtl"><head><title>فاتورة #${inv.id}</title><style>body{font-family:'Cairo',sans-serif;padding:20px;}table{width:100%;border-collapse:collapse;margin:20px 0;}th,td{border:1px solid #333;padding:8px;text-align:center;}th{background:#f2f2f2;}</style></head><body><h2 style="text-align:center;">فاتورة بيع</h2><p><strong>اسم المشتري:</strong> ${this.escapeHtml(inv.buyerName)}</p><p><strong>التاريخ:</strong> ${this.formatDate(inv.date)}</p><p><strong>البائع:</strong> ${this.escapeHtml(employeeName)}</p><table><thead><tr><th>المنتج</th><th>الكمية</th><th>الإجمالي</th></tr></thead><tbody>`);
     inv.productsSold.forEach(item => { win.document.write(`<tr><td>${this.escapeHtml(item.productName)}</td><td>${this.ensureNumber(item.quantity)}</td><td>${this.ensureNumber(item.amount).toFixed(2)}</td></tr>`); });
     win.document.write(`</tbody><tfoot><tr><td colspan="2">الإجمالي</td><td>${this.ensureNumber(inv.totalAmount).toFixed(2)}</td></tr></tfoot></table><script>window.onload = function() { window.print(); window.close(); }<\/script></body></html>`);
     win.document.close();
@@ -957,6 +982,30 @@ class AccountingApp {
     let html = `<div class="financial-report"><h3>📊 تقرير المبيعات حسب المنتج</h3><table><thead><tr><th>اسم المنتج</th><th>الكمية المباعة</th><th>الكمية المتبقية</th><th>إجمالي المبيعات</th></tr></thead><tbody>`;
     for (const id in data) { const d = data[id]; html += `<tr><td>${this.escapeHtml(d.name)}</td><td>${d.qty}</td><td>${this.ensureNumber(d.stock)}</td><td>${this.ensureNumber(d.total).toFixed(2)}</td></tr>`; }
     html += `</tbody><tfoot><tr><td colspan="3"><strong>إجمالي المبيعات الكلي</strong></td><td><strong>${grand.toFixed(2)}</strong></td></tr></tfoot></table></div>`;
+    this.elements.financialReport.innerHTML = html;
+  }
+
+  // ===== تقرير مبيعات الموظفين (جديد) =====
+  showEmployeeSalesReport() {
+    const employeeSales = {};
+    this.invoices.forEach(inv => {
+      const emp = inv.createdBy || 'admin@admin';
+      if (!employeeSales[emp]) employeeSales[emp] = { total: 0, count: 0 };
+      employeeSales[emp].total += inv.totalAmount;
+      employeeSales[emp].count += 1;
+    });
+    if (Object.keys(employeeSales).length === 0) {
+      this.elements.financialReport.innerHTML = '<div class="financial-report"><p class="empty">لا توجد فواتير مسجلة بعد.</p></div>';
+      return;
+    }
+    const users = getUsers();
+    let html = `<div class="financial-report"><h3>👥 تقرير مبيعات الموظفين</h3><table><thead><tr><th>الموظف</th><th>عدد الفواتير</th><th>إجمالي المبيعات</th></tr></thead><tbody>`;
+    for (const [email, data] of Object.entries(employeeSales)) {
+      const user = users.find(u => u.email === email);
+      const name = user ? (user.displayName || user.email) : email;
+      html += `<tr><td>${this.escapeHtml(name)}</td><td>${data.count}</td><td>${data.total.toFixed(2)}</td></tr>`;
+    }
+    html += '</tbody></table></div>';
     this.elements.financialReport.innerHTML = html;
   }
 
@@ -1018,7 +1067,7 @@ class AccountingApp {
     win.document.close();
   }
 
-  // ========== الرسوم البيانية ==========
+  // ========== الرسوم البيانية (محسّنة + حسب الموظف) ==========
   loadChartSettings() {
     const saved = localStorage.getItem('chartSettings');
     return saved ? JSON.parse(saved) : {
@@ -1092,6 +1141,47 @@ class AccountingApp {
     }];
     return { labels: years, datasets };
   }
+
+  // بيانات الرسم البياني حسب الموظف
+  generateEmployeeChartData(periodType, dateFrom, dateTo) {
+    const salesByPeriod = {};
+    const from = this.parseOptionalDate(dateFrom);
+    const to = this.parseOptionalDate(dateTo);
+    const getKey = (dateStr, type) => {
+      const d = new Date(dateStr);
+      const y = d.getFullYear(), m = d.getMonth()+1, day = d.getDate(), week = Math.ceil(day/7);
+      switch(type) {
+        case 'daily': return `${y}-${m}-${day}`;
+        case 'weekly': return `${y}-أسبوع ${week}`;
+        case 'monthly': return `${y}-${m}`;
+        case 'yearly': return `${y}`;
+        default: return `${y}-${m}-${day}`;
+      }
+    };
+    // تجميع الموظفين
+    const allEmployees = new Set();
+    this.invoices.forEach(inv => {
+      const invDate = new Date(inv.date);
+      if ((from && invDate < from) || (to && invDate > to)) return;
+      const period = getKey(inv.date, periodType);
+      const emp = inv.createdBy || 'admin@admin';
+      allEmployees.add(emp);
+      if (!salesByPeriod[period]) salesByPeriod[period] = {};
+      if (!salesByPeriod[period][emp]) salesByPeriod[period][emp] = 0;
+      salesByPeriod[period][emp] += inv.totalAmount;
+    });
+    const labels = Object.keys(salesByPeriod).sort();
+    const employees = Array.from(allEmployees);
+    const users = getUsers();
+    const datasets = employees.map((email, i) => {
+      const user = users.find(u => u.email === email);
+      const name = user ? (user.displayName || user.email) : email;
+      const data = labels.map(p => salesByPeriod[p]?.[email] || 0);
+      return { label: name, data, backgroundColor: CHART_COLORS[i % CHART_COLORS.length], borderColor: CHART_COLORS[i % CHART_COLORS.length] };
+    });
+    return { labels, datasets };
+  }
+
   calculateChartStats(chartData) {
     if (!chartData || !chartData.labels || chartData.labels.length === 0) return null;
     let total = 0, maxVal = 0, maxPeriod = '';
@@ -1181,6 +1271,11 @@ class AccountingApp {
     document.getElementById('compareProductsGroup').style.display = mode === 'compare' ? 'block' : 'none';
     document.getElementById('yearCompareGroup').style.display = mode === 'yearCompare' ? 'block' : 'none';
     document.getElementById('trendWindowGroup').style.display = this.elements.trendLineToggle.checked ? 'block' : 'none';
+    // إخفاء مجموعات المنتجات عند وضع employee
+    if (mode === 'employee') {
+      document.getElementById('compareProductsGroup').style.display = 'none';
+      document.getElementById('yearCompareGroup').style.display = 'none';
+    }
   }
   populateProductSelects() {
     const productSelect = this.elements.productSelect;
@@ -1203,7 +1298,8 @@ class AccountingApp {
   }
   generateChartData(periodType, productIds, comparisonMode, dateFrom, dateTo) {
     const salesByPeriod = {};
-    const from = dateFrom ? new Date(dateFrom) : null, to = dateTo ? new Date(dateTo) : null;
+    const from = this.parseOptionalDate(dateFrom);
+    const to = this.parseOptionalDate(dateTo);
     const getKey = (dateStr, type) => {
       const d = new Date(dateStr);
       const y = d.getFullYear(), m = d.getMonth()+1, day = d.getDate(), week = Math.ceil(day/7);
@@ -1244,17 +1340,60 @@ class AccountingApp {
       return { labels, datasets };
     }
   }
+
   renderChart() {
     this.saveChartSettings();
+    const dateFrom = this.elements.dateFrom.value;
+    const dateTo = this.elements.dateTo.value;
+
+    if (!this.validateDateRange(dateFrom, dateTo)) {
+      this.elements.dateFrom.value = '';
+      this.elements.dateTo.value = '';
+      this.setDefaultDateRange();
+      this.showAllChartData();
+      return;
+    }
+
     const chartType = this.elements.chartType.value;
     const periodType = this.elements.periodType.value;
     const compMode = this.elements.comparisonMode.value;
-    const dateFrom = this.elements.dateFrom.value, dateTo = this.elements.dateTo.value;
     const trendActive = this.elements.trendLineToggle.checked;
     const trendWindow = parseInt(this.elements.trendWindow.value) || 3;
+
+    if (this.invoices.length === 0) {
+      this.clearChartExtras();
+      this.elements.chartStatsContainer.innerHTML = '<p class="empty">لا توجد فواتير مُحرَّرة بعد. قم بإنشاء فاتورة وتحريرها لعرض الرسم البياني.</p>';
+      if (this.chart) { this.chart.destroy(); this.chart = null; }
+      const canvas = document.getElementById('salesChart');
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.font = "18px Cairo";
+        ctx.fillStyle = "#999";
+        ctx.textAlign = "center";
+        ctx.fillText("لا توجد بيانات مبيعات بعد", canvas.width/2, canvas.height/2);
+      }
+      return;
+    }
+
     let chartData;
     if (compMode === 'yearCompare') {
       chartData = this.generateYearCompareData(this.elements.compareYearMonth.value);
+    } else if (compMode === 'employee') {
+      chartData = this.generateEmployeeChartData(periodType, dateFrom, dateTo);
+      if (chartData.labels.length === 0) {
+        this.clearChartExtras();
+        this.elements.chartStatsContainer.innerHTML = '<p class="empty">لا توجد بيانات للموظفين في هذه الفترة.</p>';
+        if (this.chart) { this.chart.destroy(); this.chart = null; }
+        const canvas = document.getElementById('salesChart');
+        if (canvas) {
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0,0,canvas.width,canvas.height);
+          ctx.font = "18px Cairo"; ctx.fillStyle = "#999"; ctx.textAlign = "center";
+          ctx.fillText("لا توجد بيانات", canvas.width/2, canvas.height/2);
+        }
+        return;
+      }
     } else {
       let productIds;
       if (compMode === 'single') {
@@ -1265,7 +1404,23 @@ class AccountingApp {
       }
       chartData = this.generateChartData(periodType, productIds, compMode, dateFrom, dateTo);
     }
-    if (chartData.labels.length === 0) { alert('لا توجد بيانات في هذه الفترة'); this.clearChartExtras(); return; }
+
+    if (chartData.labels.length === 0) {
+      this.clearChartExtras();
+      this.elements.chartStatsContainer.innerHTML = '<p class="empty">لم يتم العثور على مبيعات خلال الفترة المحددة أو للمنتج المختار. جرب تغيير النطاق الزمني أو اختر "كل المنتجات".</p>';
+      if (this.chart) { this.chart.destroy(); this.chart = null; }
+      const canvas = document.getElementById('salesChart');
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.font = "18px Cairo";
+        ctx.fillStyle = "#999";
+        ctx.textAlign = "center";
+        ctx.fillText("لا توجد بيانات تطابق بحثك", canvas.width/2, canvas.height/2);
+      }
+      return;
+    }
+
     chartData.datasets.forEach((ds, i) => {
       if (!ds.backgroundColor) {
         const color = CHART_COLORS[i % CHART_COLORS.length];
@@ -1312,6 +1467,15 @@ class AccountingApp {
     const tBody = document.querySelector('#chartDataTable tbody');
     if (tHead) tHead.innerHTML = '';
     if (tBody) tBody.innerHTML = '';
+  }
+  showAllChartData() {
+    this.elements.dateFrom.value = '';
+    this.elements.dateTo.value = '';
+    this.elements.productSelect.value = 'all';
+    this.elements.comparisonMode.value = 'single';
+    this.updateComparisonVisibility();
+    this.setDefaultDateRange();
+    this.renderChart();
   }
 
   // ========== تصدير/استيراد ==========
@@ -1391,10 +1555,12 @@ class AccountingApp {
 
   // ========== إدارة المستخدمين (للأدمن) ==========
   addUser() {
+    const name = this.elements.newUserName ? this.elements.newUserName.value.trim() : '';
     const email = this.elements.newUserEmail.value.trim();
     const password = this.elements.newUserPassword.value;
     if (!email || !password) return alert('أدخل البريد وكلمة المرور');
-    if (addUserByAdmin(email, password)) {
+    if (addUserByAdmin(email, password, name)) {
+      if (this.elements.newUserName) this.elements.newUserName.value = '';
       this.elements.newUserEmail.value = '';
       this.elements.newUserPassword.value = '';
       this.renderUsersList();
@@ -1414,7 +1580,7 @@ class AccountingApp {
     const users = getUsers().filter(u => u.role !== 'admin');
     let html = '';
     users.forEach(u => {
-      html += `<div class="user-item"><span>${this.escapeHtml(u.email)} (موظف)</span><button class="delete-btn small-btn" data-email="${this.escapeHtml(u.email)}">🗑 حذف</button></div>`;
+      html += `<div class="user-item"><span>${this.escapeHtml(u.displayName || u.email)} (${this.escapeHtml(u.email)})</span><button class="delete-btn small-btn" data-email="${this.escapeHtml(u.email)}">🗑 حذف</button></div>`;
     });
     container.innerHTML = html || '<p class="empty">لا يوجد مستخدمون</p>';
     container.querySelectorAll('.delete-btn').forEach(btn => {
@@ -1439,10 +1605,10 @@ class AccountingApp {
       users[userIndex].email = newEmail;
       saveUsers(users);
     }
-    const sessionData = { email: newEmail, role: this.currentUser.role };
+    const sessionData = { email: newEmail, role: this.currentUser.role, displayName: this.currentUser.displayName || newEmail };
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
     this.currentUser.email = newEmail;
-    document.getElementById('currentUserDisplay').textContent = `${newEmail} (${this.currentUser.role === 'admin' ? 'مدير' : 'موظف'})`;
+    document.getElementById('currentUserDisplay').textContent = `${this.currentUser.displayName || newEmail} (${this.currentUser.role === 'admin' ? 'مدير' : 'موظف'})`;
     this.elements.emailChangeMsg.innerHTML = '<span style="color:green;">✅ تم تغيير البريد بنجاح</span>';
     this.elements.newEmailInput.value = '';
   }
@@ -1467,32 +1633,25 @@ class AccountingApp {
     this.elements.newPasswordInput.value = '';
   }
 
-  // ========== الإعدادات المالية (رأس المال الافتتاحي) - تم إصلاح التضاعف ==========
+  // ========== الإعدادات المالية (رأس المال الافتتاحي) ==========
   updateOpeningCapital() {
     const amount = parseFloat(this.elements.openingCapitalInput.value);
     if (isNaN(amount) || amount <= 0) {
       this.elements.capitalMsg.innerHTML = '<span style="color:red;">أدخل مبلغاً صحيحاً أكبر من صفر</span>';
       return;
     }
-    // التأكد من عدم وجود معاملات أخرى غير القيد الافتتاحي
     const otherEntries = this.journalEntries.filter(e => e.description !== 'رأس المال الافتتاحي');
     if (otherEntries.length > 0) {
       this.elements.capitalMsg.innerHTML = '<span style="color:red;">لا يمكن تغيير رأس المال بعد إجراء معاملات أخرى</span>';
       return;
     }
-    
-    // حذف القيد الافتتاحي القديم إن وجد، مع تصحيح الرصيد
     const oldEntryIndex = this.journalEntries.findIndex(e => e.description === 'رأس المال الافتتاحي');
     if (oldEntryIndex !== -1) {
       const oldEntry = this.journalEntries[oldEntryIndex];
-      // لأن القيد القديم كان مدينًا للنقدية (يزيد النقدية)، عند حذفه نطرح قيمته
       this.cashBalance -= this.ensureNumber(oldEntry.amount);
       this.journalEntries.splice(oldEntryIndex, 1);
     }
-    
-    // الآن cashBalance يجب أن يكون 0 (بعد حذف القديم)، ثم addJournalEntry ستضيف المبلغ الجديد وتضبط الرصيد
     this.addJournalEntry('رأس المال الافتتاحي', ACCOUNTS.CASH, ACCOUNTS.CAPITAL, amount);
-    
     this.saveData();
     this.elements.capitalMsg.innerHTML = '<span style="color:green;">✅ تم تحديث رأس المال الافتتاحي بنجاح</span>';
     this.elements.openingCapitalInput.value = '';
@@ -1616,6 +1775,7 @@ class AccountingApp {
       receivingSupplier: document.getElementById('receivingSupplier'),
       receiveQuantity: document.getElementById('receiveQuantity'),
       receiveCost: document.getElementById('receiveCost'),
+      newUserName: document.getElementById('newUserName'),
       newUserEmail: document.getElementById('newUserEmail'),
       newUserPassword: document.getElementById('newUserPassword'),
       addUserBtn: document.getElementById('addUserBtn'),
@@ -1630,7 +1790,9 @@ class AccountingApp {
       fullLogoutBtn: document.getElementById('fullLogoutBtn'),
       openingCapitalInput: document.getElementById('openingCapitalInput'),
       updateCapitalBtn: document.getElementById('updateCapitalBtn'),
-      capitalMsg: document.getElementById('capitalMsg')
+      capitalMsg: document.getElementById('capitalMsg'),
+      showAllBtn: document.getElementById('showAllChartBtn'),
+      employeeSalesReportBtn: document.getElementById('employeeSalesReportBtn')
     };
 
     this.elements.addCategoryBtn.addEventListener('click', () => this.addCategory(this.elements.categoryName.value));
@@ -1655,6 +1817,10 @@ class AccountingApp {
     this.elements.exportJSONBtn.addEventListener('click', () => this.exportToJSON());
     this.elements.importJSONFile.addEventListener('change', (e) => this.importFromJSON(e.target.files[0]));
     this.elements.resetDataBtn.addEventListener('click', () => this.resetData());
+
+    if (this.elements.employeeSalesReportBtn) {
+      this.elements.employeeSalesReportBtn.addEventListener('click', () => this.showEmployeeSalesReport());
+    }
 
     this.elements.addByBarcodeBtn.addEventListener('click', () => {
       const barcode = this.elements.barcodeInput.value.trim();
@@ -1699,6 +1865,10 @@ class AccountingApp {
         fullLogout();
       }
     });
+
+    if (this.elements.showAllBtn) {
+      this.elements.showAllBtn.addEventListener('click', () => this.showAllChartData());
+    }
 
     ['chartType','periodType','productSelect','comparisonMode','dateFrom','dateTo','trendLineToggle','trendWindow','compareYearMonth'].forEach(id => {
       if (this.elements[id]) this.elements[id].addEventListener('change', () => this.saveChartSettings());
